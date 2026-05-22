@@ -1,4 +1,5 @@
-@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&display=swap');
+/* @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&display=swap'); */
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Orbitron:wght@400;500;600;700;800;900&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&display=swap');
 
 :root {
   --bg:           #080810;
@@ -17,10 +18,15 @@
   --blue-dim:     rgba(96,165,250,0.08);
   --blue-border:  rgba(96,165,250,0.2);
   --green:        #4ade80;
-  --font-head:    'Syne', sans-serif;
+  --font-head:    'DM Sans', sans-serif;
   --font-mono:    'DM Mono', monospace;
 }
 
+h1.font-orbitron,
+h2.font-orbitron,
+h3.font-orbitron {
+  font-family: 'Orbitron', sans-serif;
+}
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html { scroll-behavior: smooth; }
 
