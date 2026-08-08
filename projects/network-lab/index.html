@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Network Security Lab: Interactive Networking from a Security Lens | Ciprian Dumitru</title>
+  <meta name="description" content="An interactive guide to computer networking from a security perspective: from the OSI model to segmentation, firewalls, IDS/IPS and EDR, plus a drag-and-drop network builder that lets you design a topology and simulate attacks against it." />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<nav>
+  <a class="nav-back" href="../../index.html">← Portfolio</a>
+  <ul class="nav-links">
+    <li><a href="#fundamentals">Fundamentals</a></li>
+    <li><a href="#addressing">Addressing</a></li>
+    <li><a href="#protocols">Protocols</a></li>
+    <li><a href="#segmentation">Segmentation</a></li>
+    <li><a href="#defense">Defense</a></li>
+    <li><a href="#attacks">Attacks</a></li>
+    <li><a href="#lab">Lab ▸</a></li>
+  </ul>
+  <span class="nav-badge">Learning</span>
+</nav>
+
+<!-- ================= HERO ================= -->
+<section id="hero">
+  <p class="hero-kicker">Networking · Security Perspective · Interactive</p>
+  <h1 class="hero-h1">Network <em>Security</em><br>Lab &amp; <span class="alt">Field Guide</span></h1>
+  <p class="hero-lead">
+    A hands-on tour through computer networking, built for people who care <strong>how attackers move</strong>
+    and <strong>where defenders stop them</strong>. Start from packets and IP addressing, climb up to
+    segmentation, firewalls, IDS/IPS and EDR. Then jump into the <strong>Network Lab</strong>: drag endpoints
+    onto a canvas, wire them together, place security controls, and <strong>simulate real attacks</strong> to
+    see whether your design holds, or gets dropped at the perimeter.
+  </p>
+  <div class="hero-cta">
+    <a class="btn btn-solid" href="#lab">Open the Network Lab</a>
+    <a class="btn" href="#fundamentals">Start Learning</a>
+  </div>
+</section>
+
+<div class="content">
+
+  <!-- ============ 01 FUNDAMENTALS ============ -->
+  <div class="section-header reveal" id="fundamentals">
+    <p class="section-number" data-n="01">Fundamentals</p>
+    <h2 class="section-title">How data actually moves</h2>
+    <p class="section-intro">
+      Before you can defend a network, you need a clear mental model of what a network <em>is</em>:
+      layered rules that turn a click into electrical signals and back into a web page, and every layer
+      is an attack surface.
+    </p>
+  </div>
+
+  <div class="block reveal">
+    <div class="block-title"><span class="dot"></span>The OSI &amp; TCP/IP models</div>
+    <p>
+      Networking is built in <strong>layers</strong>. Each layer only talks to the one above and below it,
+      which is why we can swap Wi-Fi for Ethernet without rewriting the web. Two models describe this: the
+      7-layer <em>OSI</em> teaching model and the 4-layer <em>TCP/IP</em> model the internet actually runs on.
+    </p>
+    <table class="data">
+      <tr><th>OSI Layer</th><th>Job</th><th>Examples</th><th>Where attacks land</th></tr>
+      <tr><td>7 · Application</td><td>What the user sees</td><td>HTTP, DNS, SMB</td><td>Phishing, web exploits, C2</td></tr>
+      <tr><td>6 · Presentation</td><td>Encoding / encryption</td><td>TLS, SSL</td><td>Weak ciphers, downgrade</td></tr>
+      <tr><td>5 · Session</td><td>Connection state</td><td>RPC, NetBIOS</td><td>Session hijacking</td></tr>
+      <tr><td>4 · Transport</td><td>End-to-end delivery</td><td>TCP, UDP</td><td>Port scans, SYN floods</td></tr>
+      <tr><td>3 · Network</td><td>Logical addressing / routing</td><td>IP, ICMP</td><td>IP spoofing, routing abuse</td></tr>
+      <tr><td>2 · Data Link</td><td>Local delivery on a segment</td><td>Ethernet, ARP, MAC</td><td>ARP spoofing, MAC flooding</td></tr>
+      <tr><td>1 · Physical</td><td>Bits on the wire</td><td>Cables, radio</td><td>Tapping, jamming</td></tr>
+    </table>
+    <div class="callout tip">
+      <strong>Security lens:</strong> attackers rarely break "the network": they break a <em>specific layer</em>.
+      Naming the layer tells you which control stops it: a firewall works at L3/L4, an IDS inspects L7 payloads,
+      port security lives at L2.
+    </div>
+  </div>
+
+  <div class="block reveal">
+    <div class="block-title"><span class="dot"></span>Packets, frames &amp; encapsulation</div>
+    <p>
+      Your data is wrapped like an onion. The application produces a payload; TCP adds a <strong>segment</strong>
+      header (ports), IP adds a <strong>packet</strong> header (source/destination IP), and Ethernet adds a
+      <strong>frame</strong> header (source/destination MAC). Each hop strips and re-adds the frame; the IP
+      packet survives end to end.
+    </p>
+    <div class="code-block"><code><span class="kc"># One HTTP request, encapsulated:</span>
+[ <span class="kr">Ethernet</span> src MAC → dst MAC | [ <span class="ky">IP</span> 10.0.1.20 → 10.0.2.10 | [ <span class="kg">TCP</span> :52144 → :443 | <span class="k2">TLS ( GET /login )</span> ] ] ]
+   L2 frame              L3 packet                 L4 segment          L7 payload</code></div>
+    <p>
+      This matters for defense: a <strong>stateless firewall</strong> can only read the IP + TCP headers
+      (who is talking to whom, on what port). To see <em>what</em> is inside: an exploit, malware, a C2
+      beacon, you need deep packet inspection (an IPS) or an endpoint agent (EDR).
+    </p>
+  </div>
+
+  <div class="block reveal">
+    <div class="block-title"><span class="dot"></span>Switches vs. routers vs. gateways</div>
+    <div class="grid-3">
+      <div class="mini"><h4>Switch (L2)</h4><p>Moves frames <em>inside</em> one network using MAC addresses. Fast, dumb about IPs. A flat switch = free lateral movement.</p></div>
+      <div class="mini"><h4>Router (L3)</h4><p>Moves packets <em>between</em> networks using IP addresses. Natural chokepoint: the perfect place to enforce rules.</p></div>
+      <div class="mini"><h4>Gateway</h4><p>The router your host sends anything "not local" to. Often where the firewall and NAT live at the edge.</p></div>
+    </div>
+  </div>
+
+  <!-- ============ 02 ADDRESSING ============ -->
+  <div class="section-header reveal" id="addressing">
+    <p class="section-number" data-n="02">Addressing</p>
+    <h2 class="section-title">IP, subnets &amp; why the mask is a security control</h2>
+    <p class="section-intro">
+      Subnetting looks like math, but it's really about <em>blast radius</em>. The subnet mask decides who
+      can reach whom without crossing a router, and every router crossing is a place you can inspect and block.
+    </p>
+  </div>
+
+  <div class="block reveal">
+    <div class="block-title"><span class="dot"></span>IPv4, CIDR &amp; the subnet mask</div>
+    <p>
+      An IPv4 address is 32 bits (e.g. <strong>10.0.1.20</strong>). A <em>mask</em> splits it into a
+      <strong>network</strong> part and a <strong>host</strong> part. CIDR notation like <strong>/24</strong>
+      means "the first 24 bits are the network." Same network part = same subnet = they talk directly.
+    </p>
+    <div class="code-block"><code><span class="kc"># A /24 network</span>
+Network:   <span class="k">10.0.1.0/24</span>      <span class="kc">→ 256 addresses, 254 usable</span>
+Mask:      255.255.255.0
+Gateway:   10.0.1.1          <span class="kc">→ the router / firewall</span>
+Hosts:     10.0.1.2 – 10.0.1.254
+Broadcast: 10.0.1.255
+
+<span class="kc"># 10.0.1.20 and 10.0.1.50 → SAME subnet → direct L2 talk (no firewall between them)</span>
+<span class="kc"># 10.0.1.20 and 10.0.2.50 → DIFFERENT subnets → must cross the router → inspectable</span></code></div>
+    <table class="data">
+      <tr><th>CIDR</th><th>Mask</th><th>Usable hosts</th><th>Typical use</th></tr>
+      <tr><td>/30</td><td>255.255.255.252</td><td>2</td><td>Router-to-router link</td></tr>
+      <tr><td>/29</td><td>255.255.255.248</td><td>6</td><td>Small DMZ</td></tr>
+      <tr><td>/24</td><td>255.255.255.0</td><td>254</td><td>A department / VLAN</td></tr>
+      <tr><td>/16</td><td>255.255.0.0</td><td>65,534</td><td>A whole flat site (risky!)</td></tr>
+    </table>
+    <div class="callout warn">
+      <strong>Anti-pattern:</strong> one giant <em>/16</em> flat network where servers, workstations and
+      printers all share a subnet. Nothing sits between them, so one compromised laptop can scan and pivot
+      to everything. Segmentation is the fix: see section 04.
+    </div>
+  </div>
+
+  <div class="block reveal">
+    <div class="block-title"><span class="dot"></span>Public vs. private &amp; NAT</div>
+    <p>
+      RFC 1918 ranges: <strong>10.0.0.0/8</strong>, <strong>172.16.0.0/12</strong> and
+      <strong>192.168.0.0/16</strong> are private and never routed on the internet. <strong>NAT</strong> at
+      the edge translates them to one public IP outbound. That's convenient, but remember: NAT is
+      <em>not</em> a firewall. It hides addresses; it doesn't decide who's allowed to talk.
+    </p>
+  </div>
+
+  <!-- ============ 03 PROTOCOLS ============ -->
+  <div class="section-header reveal" id="protocols">
+    <p class="section-number" data-n="03">Protocols</p>
+    <h2 class="section-title">The protocols attackers love</h2>
+    <p class="section-intro">
+      Every protocol is a trust assumption. Learn the normal behaviour, and the abuse becomes obvious.
+    </p>
+  </div>
+
+  <div class="block reveal">
+    <div class="block-title"><span class="dot"></span>The TCP three-way handshake</div>
+    <p>Before any data, TCP negotiates a connection. Understanding this is what makes port scanning and SYN floods make sense.</p>
+    <div class="code-block"><code>Client ──<span class="kg">SYN</span>──▶ Server        <span class="kc">"can we talk on :445?"</span>
+Client ◀─<span class="k">SYN-ACK</span>─ Server        <span class="kc">"yes" → the port is OPEN</span>
+Client ──<span class="kg">ACK</span>──▶ Server        <span class="kc">connection established</span>
+
+<span class="kc"># A port scanner sends SYN to 1000 ports and just watches who answers SYN-ACK.</span>
+<span class="kc"># A SYN flood sends millions of SYNs and never finishes → exhausts the server.</span></code></div>
+  </div>
+
+  <div class="block reveal">
+    <div class="block-title"><span class="dot"></span>Core protocols &amp; their common abuse</div>
+    <table class="data">
+      <tr><th>Protocol</th><th>Port</th><th>Purpose</th><th>How it's abused</th></tr>
+      <tr><td>ARP</td><td>n/a</td><td>MAC ↔ IP on a segment</td><td>ARP spoofing → man-in-the-middle</td></tr>
+      <tr><td>DHCP</td><td>67/68</td><td>Hand out IPs</td><td>Rogue DHCP → redirect traffic</td></tr>
+      <tr><td>DNS</td><td>53</td><td>Name → IP</td><td>Tunneling / exfil, C2 over DNS</td></tr>
+      <tr><td>HTTP/S</td><td>80/443</td><td>Web</td><td>Web exploits, C2 hidden in TLS</td></tr>
+      <tr><td>SMB</td><td>445</td><td>Windows file sharing</td><td>Lateral movement, ransomware spread</td></tr>
+      <tr><td>RDP</td><td>3389</td><td>Remote desktop</td><td>Brute force, hands-on-keyboard access</td></tr>
+      <tr><td>Kerberos / LDAP</td><td>88 / 389</td><td>Active Directory auth</td><td>Kerberoasting, AD enumeration</td></tr>
+    </table>
+    <div class="callout">
+      <strong>Rule of thumb:</strong> <em>445 (SMB)</em> and <em>3389 (RDP)</em> should almost never be open
+      between user subnets, and never from the internet. In the Lab, leaving these open is exactly what lets
+      the attack scenarios succeed.
+    </div>
+  </div>
+
+  <!-- ============ 04 SEGMENTATION ============ -->
+  <div class="section-header reveal" id="segmentation">
+    <p class="section-number" data-n="04">Segmentation</p>
+    <h2 class="section-title">Perimeters, DMZs &amp; zero trust</h2>
+    <p class="section-intro">
+      Segmentation is the single highest-leverage design decision in network security. It turns "one breach =
+      game over" into "one breach = one contained zone."
+    </p>
+  </div>
+
+  <div class="block reveal">
+    <div class="block-title"><span class="dot"></span>North-south vs. east-west</div>
+    <div class="grid-2">
+      <div class="mini"><h4>North-South traffic</h4><p>In and out of the network (internet ⇄ your servers). Historically the only thing firewalls watched. This is your <em>perimeter</em>.</p></div>
+      <div class="mini"><h4>East-West traffic</h4><p>Server-to-server, host-to-host <em>inside</em> the network. Where lateral movement happens. Modern attacks live here, and flat networks are blind to it.</p></div>
+    </div>
+  </div>
+
+  <div class="block reveal">
+    <div class="block-title"><span class="dot"></span>The DMZ &amp; tiered zones</div>
+    <p>
+      A <strong>DMZ</strong> (demilitarized zone) is a subnet for anything the internet must reach: web
+      servers, mail, VPN. It sits between two firewall rules: the internet can reach the DMZ, but the DMZ
+      <em>cannot</em> freely reach your internal LAN. So even if the web server is popped, the attacker is
+      stuck in a low-value zone.
+    </p>
+    <div class="code-block"><code><span class="k">INTERNET</span> ──▶ [ Firewall ] ──▶ <span class="ky">DMZ</span> (web, mail)  10.0.9.0/24
+                             │
+                             ▼ (tightly filtered)
+                        [ Firewall ] ──▶ <span class="kg">INTERNAL LAN</span>  10.0.1.0/24
+                                              ├─ Workstations
+                                              ├─ Domain Controller (AD)
+                                              └─ Databases  10.0.5.0/24 (most restricted)</code></div>
+    <div class="callout tip">
+      <strong>Zero Trust</strong> takes this further: never trust a host just because it's "inside."
+      Every request is authenticated and authorized, and east-west traffic is filtered by default:
+      micro-segmentation down to the individual workload.
+    </div>
+  </div>
+
+  <!-- ============ 05 DEFENSE ============ -->
+  <div class="section-header reveal" id="defense">
+    <p class="section-number" data-n="05">Defense</p>
+    <h2 class="section-title">Firewalls, IDS, IPS &amp; EDR</h2>
+    <p class="section-intro">
+      Each control sees a different slice of the traffic. Layering them is "defense in depth", and knowing
+      <em>what each one can and can't see</em> is how you place them correctly in the Lab.
+    </p>
+  </div>
+
+  <div class="block reveal">
+    <div class="block-title"><span class="dot"></span>Firewalls: stateless vs. stateful</div>
+    <p>
+      A firewall filters traffic against a <strong>rule list</strong>, evaluated top-down, first match wins,
+      with an implicit <em>deny all</em> at the end. A <strong>stateless</strong> firewall judges each packet
+      alone; a <strong>stateful</strong> one remembers connections, so it can allow the reply to a request it
+      already permitted.
+    </p>
+    <div class="code-block"><code><span class="kc"># A simple rule set (this is the exact syntax the Lab firewall understands)</span>
+<span class="kg">ALLOW</span> 10.0.1.0/24 -> 10.0.9.10 : 443     <span class="kc"># staff can reach the web server</span>
+<span class="kr">DENY</span>  any          -> 10.0.5.0/24 : 445   <span class="kc"># nobody reaches the DB over SMB</span>
+<span class="kr">DENY</span>  any          -> any        : 3389  <span class="kc"># no RDP anywhere</span>
+<span class="kr">DENY</span>  any          -> any                <span class="kc"># implicit: deny everything else</span></code></div>
+  </div>
+
+  <div class="block reveal">
+    <div class="block-title"><span class="dot"></span>IDS vs. IPS vs. EDR</div>
+    <table class="data">
+      <tr><th>Control</th><th>Sees</th><th>Action</th><th>Position</th></tr>
+      <tr><td><strong>IDS</strong>, Intrusion Detection</td><td>Copy of traffic (L7 payloads)</td><td>Alerts only, passive</td><td>Off a span/tap port</td></tr>
+      <tr><td><strong>IPS</strong>, Intrusion Prevention</td><td>Live traffic inline</td><td><em>Blocks</em> matching packets</td><td>Inline on a chokepoint</td></tr>
+      <tr><td><strong>EDR</strong>, Endpoint Detection</td><td>Everything on the host</td><td>Kills processes, isolates host</td><td>Agent on each endpoint</td></tr>
+      <tr><td><strong>Proxy</strong></td><td>Terminates &amp; inspects web/TLS</td><td>Filters URLs, strips content</td><td>Between users and internet</td></tr>
+    </table>
+    <div class="callout">
+      <strong>Placement is everything:</strong> an IPS only stops what passes <em>through</em> it, so it must sit
+      on the path the attack takes. EDR catches what the network misses: encrypted C2, insider actions, because
+      it watches the process, not the packet. In the Lab, an attack is blocked only if a control that can see it
+      is actually on the route.
+    </div>
+  </div>
+
+  <div class="block reveal">
+    <div class="block-title"><span class="dot"></span>How segmentation is really enforced</div>
+    <p>
+      A common misconception is that you drop a firewall between every device. You don't: enforcement is
+      <strong>layered</strong>, and it depends on whether traffic stays inside a segment or crosses between zones:
+    </p>
+    <table class="data">
+      <tr><th>Traffic</th><th>What sees it</th><th>How you enforce policy</th></tr>
+      <tr><td><strong>Same subnet</strong> (east-west, one VLAN)</td><td>Only the switch, no router/firewall is in the path</td><td><em>Micro-segmentation</em>: host firewall (GPO / iptables), SDN (NSX, Cisco ACI, Illumio), cloud Security Groups, EDR</td></tr>
+      <tr><td><strong>Between zones</strong> (VLAN → VLAN)</td><td>The L3 device that routes them</td><td>Firewall / NGFW at the boundary, or L3 ACLs on the router: <em>default-deny</em>, allow-list known flows</td></tr>
+      <tr><td><strong>In / out</strong> (north-south)</td><td>The perimeter</td><td>Edge firewall + DMZ + egress filtering / proxy</td></tr>
+    </table>
+    <div class="callout warn">
+      <strong>The lesson most people miss:</strong> two hosts in the same subnet talk <em>directly</em> through the
+      switch, no network firewall ever sees that traffic. That's why lateral movement (SMB, RDP) works so well in
+      flat networks, and why a firewall between subnets does <strong>not</strong> stop movement <em>within</em> one.
+      To contain the same-subnet blast radius you need host-based controls (micro-seg / host firewall / EDR).
+    </div>
+    <div class="callout tip">
+      The Lab models exactly this: draw a <strong>Segment</strong> and hosts inside it share an L2 domain, so
+      perimeter and zone controls are bypassed between them: only a host firewall or EDR stops an intra-segment
+      attack. Mark a segment <strong>isolated (default-deny)</strong> to enforce a zone ACL on traffic arriving
+      from other segments.
+    </div>
+  </div>
+
+  <!-- ============ 06 ATTACKS ============ -->
+  <div class="section-header reveal" id="attacks">
+    <p class="section-number" data-n="06">Attacks</p>
+    <h2 class="section-title">Attack paths &amp; where they break</h2>
+    <p class="section-intro">
+      These are the scenarios you can run in the Lab. For each: how it works, and the design that stops it.
+    </p>
+  </div>
+
+  <div class="block reveal">
+    <div class="block-title"><span class="dot"></span>The scenarios</div>
+    <div class="grid-2">
+      <div class="mini"><h4>External Port Scan</h4><p>Attacker on the internet probes your public IPs for open ports. <em>Stops at:</em> a perimeter firewall that denies inbound to internal subnets.</p></div>
+      <div class="mini"><h4>SMB Lateral Movement</h4><p>A compromised workstation spreads to others / to servers over port 445. <em>Stops at:</em> east-west firewall or IPS denying 445 between subnets.</p></div>
+      <div class="mini"><h4>RDP Brute Force</h4><p>Attacker hammers 3389 to guess credentials for hands-on access. <em>Stops at:</em> deny 3389, or EDR / IPS flagging the pattern.</p></div>
+      <div class="mini"><h4>Ransomware C2 Callback</h4><p>Malware on a host beacons out to a command server. <em>Stops at:</em> egress firewall + EDR on the endpoint (it hides in TLS, so network alone often misses it).</p></div>
+      <div class="mini"><h4>AD / Kerberoast</h4><p>Attacker enumerates the Domain Controller to crack service accounts. <em>Stops at:</em> segmenting the DC, IPS signatures, tight LDAP/Kerberos exposure.</p></div>
+      <div class="mini"><h4>Data Exfiltration</h4><p>Attacker pushes stolen data out to the internet. <em>Stops at:</em> egress filtering + proxy/DLP inspection on the way out.</p></div>
+      <div class="mini"><h4>Volumetric DDoS</h4><p>A botnet floods a public host to knock it offline. <em>Stops at:</em> upstream scrubbing / CDN, <strong>not</strong> your on-prem firewall, because the link saturates before it.</p></div>
+    </div>
+    <div class="callout warn">
+      <strong>Why DDoS is different:</strong> it targets <em>availability</em>, not access. A firewall or IPS sits
+      <em>behind</em> your internet link, so a large volumetric flood saturates the pipe before those devices can
+      help. Realistic mitigation happens <strong>upstream</strong>: a CDN / anti-DDoS scrubbing provider (Cloudflare,
+      Akamai, AWS Shield) absorbs the flood and forwards only clean traffic. In the Lab, place a
+      <strong>DDoS Scrubbing / CDN</strong> node between the internet and your target to survive the attack.
+    </div>
+    <div class="callout tip">
+      <strong>Now build it:</strong> the section below is a live sandbox. Design a network, place your controls,
+      pick a scenario, and hit run. If your architecture is sound, you'll watch the packets get
+      <em>dropped</em>. If not, you'll see exactly where the attacker gets through.
+    </div>
+  </div>
+
+</div><!-- /content -->
+
+<!-- ================= NETWORK LAB ================= -->
+<section id="lab">
+  <div class="lab-head">
+    <p class="section-number" data-n="LAB">Interactive Sandbox</p>
+    <h2 class="section-title">Build a network. Attack it. See if it holds.</h2>
+    <p class="section-intro">
+      Drag devices from the palette onto the canvas. Hover a node and drag from its blue port to another node
+      to wire them (or use the <strong>Connect</strong> tool). Click a node to edit its IP and open ports,
+      and click a firewall to write rules. Use the <strong>Segment</strong> tool to rubber-band a subnet zone around
+      a group of devices; drag the zone to move them together. Then pick an attack scenario below and run it.
+    </p>
+  </div>
+
+  <div class="lab-shell">
+    <!-- Palette -->
+    <aside class="lab-palette" id="labPalette"><!-- populated by JS --></aside>
+
+    <!-- Canvas -->
+    <div class="lab-canvas-wrap" id="labCanvasWrap">
+      <div class="lab-toolbar" id="labToolbar">
+        <button class="tool-btn" data-tool="select" title="Select / move (V)"><span data-ic="cursor"></span> Select</button>
+        <button class="tool-btn" data-tool="connect" title="Connect nodes (C)"><span data-ic="link"></span> Connect</button>
+        <button class="tool-btn" data-tool="zone" title="Draw a network segment (Z)"><span data-ic="layout"></span> Segment</button>
+        <button class="tool-btn" data-action="fit" title="Fit to view"><span data-ic="maximize"></span> Fit</button>
+        <button class="tool-btn danger" data-action="clear" title="Clear canvas"><span data-ic="trash"></span> Clear</button>
+        <button class="tool-btn" data-action="demo" title="Load a demo network"><span data-ic="layout"></span> Demo</button>
+        <button class="tool-btn" data-action="save" title="Save to browser"><span data-ic="save"></span> Save</button>
+      </div>
+      <svg id="labCanvas" xmlns="http://www.w3.org/2000/svg"></svg>
+      <div class="canvas-hint" id="canvasHint">
+        <div class="big">Your canvas is empty</div>
+        Drag a device here, or hit <strong>Demo</strong> to load a sample network.
+      </div>
+    </div>
+
+    <!-- Inspector -->
+    <aside class="lab-inspector" id="labInspector">
+      <div class="insp-empty">Select a node or connection to inspect and edit its properties.</div>
+    </aside>
+  </div>
+
+  <!-- Simulation -->
+  <div class="lab-sim">
+    <div class="sim-controls">
+      <div class="sim-h"><span data-ic="crosshair"></span> Attack Scenarios</div>
+      <div class="scenario-list" id="scenarioList"><!-- populated by JS --></div>
+      <button class="sim-run" id="simRun" disabled>Select a scenario to run</button>
+    </div>
+    <div class="sim-console">
+      <div class="sim-h"><span data-ic="terminal"></span> Simulation Console</div>
+      <div class="console" id="simConsole"><div class="line info">// Waiting for simulation… build a network and run a scenario.</div></div>
+      <div class="verdict" id="simVerdict"></div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <span>Ciprian Dumitru © 2026 · Network Security Lab</span>
+  <a href="../../index.html">← Back to portfolio</a>
+</footer>
+
+<script src="js/icons.js"></script>
+<script src="js/data.js"></script>
+<script src="js/canvas.js"></script>
+<script src="js/simulation.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
