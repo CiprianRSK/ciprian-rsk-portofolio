@@ -25,10 +25,9 @@
   <section id="hero">
     <p class="hero-tag">Cybersecurity Analyst</p>
     <h1 class="hero-name font-orbitron">Ciprian<br>Dumitru</h1>
-    <p class="hero-title">Red Team mindset. <span>Blue Team discipline.</span></p>
+    <p class="hero-title"><span>Purple Team mindset.</span></p>
     <p class="hero-bio">
-      Passionate about cybersecurity with a focus on offensive techniques — not to cause harm,
-      but to understand how attackers think and build better defenses before incidents happen.
+      Passionate about cybersecurity with a focus on defensive security — understanding how attackers think, identifying vulnerabilities, and building stronger defenses to detect, prevent, and mitigate threats before incidents happen.
     </p>
     <div class="hero-links">
       <a class="btn btn-outline" href="#projects">View Projects</a>
@@ -40,11 +39,12 @@
     <p class="section-label reveal">About</p>
     <h2 class="section-title reveal">A bit about me</h2>
     <p class="reveal" style="max-width:620px; color:var(--text-dim); font-size:0.9rem; line-height:1.9;">
-      I'm a cybersecurity analyst drawn to the offensive side of security — red teaming,
-      penetration testing, and adversary simulation. I believe the best way to build solid defenses
-      is to think like the attacker first. My work spans both sides: crafting attack chains and
-      then analyzing them from the blue team perspective to understand what was missed, what was
-      caught, and why. I document everything — because understanding the full picture matters.
+      I'm a cybersecurity analyst with strong knowledge in both offensive and defensive security.
+      I believe effective defense starts with understanding how attackers think, how they identify weaknesses,
+      build attack chains, and exploit vulnerabilities. At the same time, I approach security from the
+      Blue Team perspective: analyzing how attacks are detected, what controls stop them, what gets missed, and why.
+      I aim to bridge both sides, using an attacker's mindset to build stronger defenses and a defender's perspective
+      to understand the full attack lifecycle.
     </p>
   </section>
 
@@ -54,15 +54,27 @@
     <div class="skills-grid reveal">
 
       <div class="skill-card">
-        <div class="skill-icon"><i data-lucide="sword"></i></div>
-        <div class="skill-name">Offensive Security</div>
-        <div class="skill-desc">Red teaming, phishing simulation, payload development, C2 frameworks (Mythic, PowerShell Empire), reverse shells.</div>
-      </div>
-
-      <div class="skill-card">
         <div class="skill-icon"><i data-lucide="file-search"></i></div>
         <div class="skill-name">Incident Analysis</div>
         <div class="skill-desc">Post-incident investigation, attack timeline reconstruction, IOC identification, and structured incident reporting.</div>
+      </div>
+
+      <div class="skill-card">
+        <div class="skill-icon"><i data-lucide="cpu"></i></div>
+        <div class="skill-name">OS Internals</div>
+        <div class="skill-desc">Knowlegde of Windows & Linux System architecture, Kernel, I know how to read Assembly instructions(x86-64), syscalls, Kernel Space & User Space.</div>
+      </div>
+
+      <div class="skill-card">
+        <div class="skill-icon"><i data-lucide="bug"></i></div>
+        <div class="skill-name">Malware Analysis</div>
+        <div class="skill-desc">Static and Behavioral Malware Analysis, dissasemble and interpreting Assembly instructions and how it behaves on the system.</div>
+      </div>
+
+      <div class="skill-card">
+        <div class="skill-icon"><i data-lucide="sword"></i></div>
+        <div class="skill-name">Offensive Security</div>
+        <div class="skill-desc">Red teaming, phishing simulation, payload development, C2 frameworks (Mythic, PowerShell Empire), reverse shells.</div>
       </div>
 
       <div class="skill-card">
@@ -92,13 +104,19 @@
       <div class="skill-card">
         <div class="skill-icon"><i data-lucide="bot"></i></div>
         <div class="skill-name">AI in Security</div>
-        <div class="skill-desc">Using AI tools for automation, rapid incident triage, and building smarter workflows in security operations.</div>
+        <div class="skill-desc">Integrating and configure local agents for rapid incident response, and building new security baseline, without compromising confidentiality.</div>
       </div>
 
       <div class="skill-card">
         <div class="skill-icon"><i class="devicon-python-plain"></i></div>
         <div class="skill-name">Scripting & Code</div>
-        <div class="skill-desc">Python scripting, PowerShell, analyzing malicious code, and automating repetitive security tasks.</div>
+        <div class="skill-desc">Python scripting, NextJS/ReactJS/VanillaJS scripting, PowerShell, analyzing malicious code, and automating repetitive security tasks.</div>
+      </div>
+
+      <div class="skill-card">
+        <div class="skill-icon"><i data-lucide="server"></i></div>
+        <div class="skill-name">Security Architecture & Infrastructure</div>
+        <div class="skill-desc">Designing and securing server infrastructure by layering security controls over core infrastructure, with focus on reducing attack surface, isolation, access control, and threat mitigation.</div>
       </div>
 
     </div>
@@ -114,20 +132,17 @@
           <p class="project-meta">Interactive Web App · Networking &amp; Security</p>
           <h3 class="project-name">Network Security Lab — Build, Attack, Defend</h3>
           <p class="project-desc">
-            An interactive field guide to networking from a security perspective — from the OSI model and
+            An interactive field guide to networking from a security perspective from the OSI model and
             subnetting to segmentation, firewalls, IDS/IPS and EDR. Includes a drag-and-drop network builder:
             place endpoints, domain controllers and servers, wire them together, write firewall rules, drop in
             security controls, then simulate real attacks (SMB lateral movement, RDP brute force, C2 callback,
-            Kerberoasting, exfiltration) and watch whether your architecture drops the packets — or gets breached.
+            Kerberoasting, exfiltration) and watch whether your architecture drops the packets or gets breached.
           </p>
           <div class="project-tags">
-            <span class="tag">Interactive Canvas</span>
-            <span class="tag">SVG</span>
             <span class="tag">Firewall Rules</span>
             <span class="tag">IDS / IPS / EDR</span>
             <span class="tag">Attack Simulation</span>
             <span class="tag">Segmentation</span>
-            <span class="tag">Vanilla JS</span>
           </div>
         </div>
         <span class="project-arrow">→</span>
@@ -140,7 +155,7 @@
           <p class="project-desc">
             End-to-end adversary simulation inspired by the Mr. Robot universe.
             Covers phishing-based initial access, C2 deployment via Mythic,
-            persistence, lateral movement, and data exfiltration —
+            persistence, lateral movement, and data exfiltration
             with full blue team analysis in Splunk and Wireshark on the same timeline.
             Includes a post-incident report and MITRE ATT&CK mapping.
           </p>
